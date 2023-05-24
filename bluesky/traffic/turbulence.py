@@ -17,6 +17,7 @@ class Turbulence(Entity, replaceable=True):
 
     def setnoise(self, flag):
         self.active = flag
+        self.SetStandards([0, 0.1, 0.1])
 
     def SetStandards(self, s):
         self.sd = np.array(s) # m/s standard turbulence  (nonnegative)

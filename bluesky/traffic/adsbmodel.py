@@ -3,6 +3,7 @@ import numpy as np
 import bluesky as bs
 from bluesky.tools.aero import ft
 from bluesky.core import Entity
+from bluesky.stack import command
 
 
 class ADSB(Entity, replaceable=True):
@@ -57,3 +58,30 @@ class ADSB(Entity, replaceable=True):
         self.gs[up]  = bs.traf.gs[up]
         self.vs[up]  = bs.traf.vs[up]
         self.lastupdate[up] = self.lastupdate[up] + self.trunctime
+
+    @staticmethod
+    @command(name='ADSB')
+    def setmethod(name : 'txt' = ''):
+        ''' Select an ADSB model. '''
+        # Get a dict of all registered ADSB model
+        models = ADSB.derived()
+        names = ['OFF' if n == 'ADSB' else n for n in models]
+
+        if not name:
+            curname = 'OFF' if ADSB.selected() is ADSB \
+                else ADSB.selected().__name__
+            return True, f'Current ADSB Model: {curname}' + \
+                         f'\nAvailable ADSB models: {", ".join(names)}'
+        # Check if the requested method exists
+        if name == 'OFF':
+            ADSB.select()
+            return True, 'ADSB model turned off.'
+        model = models.get(name, None)
+        if model is None:
+            return False, f'{name} doesn\'t exist.\n' + \
+                          f'Available ADSB models: {", ".join(names)}'
+
+        # Select the requested method
+        model.select()
+        return True, f'Selected {model.__name__} as ADSB Model.'
+

@@ -58,7 +58,7 @@ class SSD(ConflictResolution):
         import sys
         return "pyclipper" in sys.modules
 
-    def detect(asas, traf):
+    def detect(self, asas, traf):
         """ Detect all current conflicts """
 
         # Check if ASAS is ON first!
@@ -66,7 +66,7 @@ class SSD(ConflictResolution):
             return
 
         # Construct the SSD
-        constructSSD(asas, traf)
+        self.constructSSD(asas, traf)
 
 
     def resolve(self, conf, ownship, intruder):
