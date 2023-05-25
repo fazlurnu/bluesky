@@ -210,7 +210,7 @@ class TrafADSL(core.Entity):
                                 created_scen = self.cre_scen(dt_lookahead, rpz, hpos, use_adsl, adsl_stdev, lat, lon, i)
                                 str_1 = f'0:00:00.00>SCEN {scen_name}'
                                 str_2 = f'00:00:00.00>PCALL {created_scen}'
-                                str_3 = f'# 00:00:00.00>FF'
+                                str_3 = f'00:00:00.00>FF'
                                 str_4 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} HOLD'
                                 str_5 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} LOGCPA {scen_name} {rpz}'
                                 str_6 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} DELETEALL'
