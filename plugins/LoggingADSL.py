@@ -89,15 +89,19 @@ class LoggingADSL(Entity):
 
         return
     
-    @stack.command(name="LogDist")
-    def log_dist(self, scenario_name):
-        # self.logdist = datalog.crelog(self.log_dir + "/LogDist", None, None)
+    @stack.command(name="LogCPA")
+    def log_cpa(self, scenario_name, rpz: float):
+        cpa_los_sev = []
+
         df_1 = pd.DataFrame(traf.cd.cpa_closest, index=traf.id, columns=traf.id)
-        df_2 = pd.DataFrame(traf.cd.dist_closest, index=traf.id, columns=traf.id)
 
         current_datetime = datetime.datetime.now()
         formatted_datetime = current_datetime.strftime("%Y_%m_%d_%H_%M_%S")
 
-        df_1.to_csv(f'{self.log_dir}/cpa_{scenario_name}_{formatted_datetime}.log')
-        df_2.to_csv(f'{self.log_dir}/dist_{scenario_name}_{formatted_datetime}.log')
-        stack.stack("ECHO LOGDIST CREATED")
+        dictionary_cpa = {(index, column): (rpz-value)/rpz*100 for index, row in df_1.iterrows() for column, value in row.items() if value < 100}
+        cpa_los_sev.extend(list(dictionary_cpa.values()))
+
+        df = pd.DataFrame({'cpa_los_sev': cpa_los_sev})
+        df.to_csv(f'{self.log_dir}/cpa_{scenario_name}_{formatted_datetime}.log')
+
+        stack.stack("ECHO LOGCPA CREATED")

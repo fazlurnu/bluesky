@@ -210,7 +210,7 @@ class TrafADSL(core.Entity):
                         str_2 = f'00:00:00.00>PCALL {created_scen}'
                         str_3 = f'# 00:00:00.00>FF'
                         str_4 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} HOLD'
-                        str_5 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} LOGDIST {scen_name} {rpz}'
+                        str_5 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} LOGCPA {scen_name} {rpz}'
                         str_6 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} DELETEALL'
 
                         f.write(f'{str_1}\n{str_2}\n{str_3}\n{str_4}\n{str_5}\n{str_6}\n\n')
