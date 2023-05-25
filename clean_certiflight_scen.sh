@@ -1,0 +1,1 @@
+rm scenario/certiflight_*.scn

@@ -125,12 +125,6 @@ class TrafADSL(core.Entity):
 
         # Calculate intruder lat/lon
         aclat, aclon = geo.kwikpos(latref, lonref, brn, dist / nm)
-
-        # noise_dist = 50/1000
-        # random_dist = random.uniform(-noise_dist, noise_dist)
-        # lat_with_noise, lon_with_noise = self.km_to_lat_lon(aclat, aclon, random_dist)
-        # aclat = lat_with_noise
-        # aclon = lon_with_noise
         
         # convert groundspeed to CAS, and track to heading using actual
         # intruder position
@@ -188,7 +182,7 @@ class TrafADSL(core.Entity):
         return True
     
     @stack.command(name = "CRE_BATCH_CONF_ADSL")
-    def cre_batch(self, lat: float = 52.5, lon: float = 5.3, nb_scen: float = 20):
+    def cre_batch(self, lat: float = 52.5, lon: float = 5.3, nb_scen: int = 20):
         scenario_path = "/Users/sryhandiniputeri/bluesky/scenario/"
         filename = f'certiflight_batch_spawn_conflict_all.scn'
         fullname = f'{scenario_path}{filename}'
@@ -203,25 +197,20 @@ class TrafADSL(core.Entity):
         # for hpos in [1.5, 5, 15]:
         for hpos in [1.5, 5, 15]:
             for dt_lookahead in [6, 15, 50, 100]:
-                if(dt_lookahead < 10):
-                    simtime = 2*dt_lookahead
-                elif(10 <= dt_lookahead < 20):
-                    simtime = 2*dt_lookahead
-                else:
-                    simtime = 2*dt_lookahead
+                simtime = 3*dt_lookahead
 
                 minute, seconds = self.seconds_to_minutes(simtime)
 
-                for rpz in [30]:
+                for rpz in [30, 50]:
                     for i in range(int(nb_scen)):
                         scenario_number += 1
                         scen_name = f'Spawn_conflict_{scenario_number}'
                         created_scen = self.cre_scen(dt_lookahead, rpz, hpos, lat, lon, i)
                         str_1 = f'0:00:00.00>SCEN {scen_name}'
                         str_2 = f'00:00:00.00>PCALL {created_scen}'
-                        str_3 = f'00:00:00.00>FF'
+                        str_3 = f'# 00:00:00.00>FF'
                         str_4 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} HOLD'
-                        str_5 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} LOGDIST {scen_name}'
+                        str_5 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} LOGDIST {scen_name} {rpz}'
                         str_6 = f'00:00:00>SCHEDULE 00:{minute}:{seconds} DELETEALL'
 
                         f.write(f'{str_1}\n{str_2}\n{str_3}\n{str_4}\n{str_5}\n{str_6}\n\n')
@@ -238,9 +227,7 @@ class TrafADSL(core.Entity):
         lon1 = lon
 
         max_speed = 35 * kts # m/s
-        box_size_in_dt_lookahead = dt_lookahead if dt_lookahead > 20 else 20
-
-        dist = (3*box_size_in_dt_lookahead*max_speed)/1000
+        dist = (4*dt_lookahead*max_speed)/1000 # in km
 
         rpz_in_nm = round(rpz / nm, 4)
 
@@ -257,7 +244,7 @@ class TrafADSL(core.Entity):
         str_4 = f'00:00:00.00>ASAS DETECTADSL'
         str_5 = f'00:00:00.00>RESO MVP'
         str_6 = f'00:00:00.00>PAN {lat} {lon}'
-        str_7 = f'00:00:00.00>++++++++++++++'
+        str_7 = f'# 00:00:00.00>++++++++++++++'
         str_8 = f'00:00:00.00>DTLOOK {dt_lookahead}'
         str_9 = f'00:00:00.00>RPZ {rpz_in_nm}'
         str_10 = f'00:00:00.00>LOGADSL {dt_lookahead} {rpz_in_nm} {hpos}'
@@ -278,7 +265,7 @@ class TrafADSL(core.Entity):
                 # str_11 = f'00:00:00.00>BOX {box_id} {lat1} {lon1} {lat2} {lon2}'
                 # self.box_counter += 1
                 
-                ac_lat = lat1 + 0.1*dlat
+                ac_lat = lat1 + 0.2*dlat
                 ac_lon = lon1 + 0.5*dlon
                 hdg = 0
                 alt_def = 100
@@ -292,7 +279,10 @@ class TrafADSL(core.Entity):
                 self.ac_counter += 1
                 drone_id_conf = "DR" + "{0:04}".format(self.ac_counter)
                 dpsi = random.uniform(10, 350)
-                dcpa = random.uniform(0, 30 / nm) # m
+
+                max_dcpa = rpz + 2*hpos
+                dcpa = random.uniform(0, max_dcpa / nm) # m
+
                 tlosh = random.uniform(dt_lookahead*0.9, dt_lookahead*1.1)
                 spd_intruder = random.uniform(15, 35)
 
@@ -310,16 +300,6 @@ class TrafADSL(core.Entity):
         stack.stack(f'ECHO Scenario Created {filename}')
 
         return filename
-    
-    # @stack.command(name='ECHO_ADSL')
-    # def echo_adsl(self):
-    #     stack.stack(f'ECHO {self.cd.adsl.ac_cat} {self.cd.adsl.ac_stat}')
-    #     stack.stack(f'ECHO {traf.gs} {self.cd.adsl.gs_noise}, {self.cd.adsl.gs_reso}')
-
-    # @stack.command(name='ECHO_ADSL')
-    # def echo_adsl(self):
-    #     stack.stack(f'ECHO {self.adsl.ac_cat} {self.adsl.ac_stat}')
-    #     stack.stack(f'ECHO {traf.gs} {self.adsl.gs_noise}, {self.adsl.gs_reso}')
     
     def km_to_lat_lon(self,
         latitude = 52.0, longitude = 5.0, distance = 1.0
@@ -350,12 +330,3 @@ class TrafADSL(core.Entity):
         minutes = seconds // 60   # Integer division to get the number of full minutes
         remaining_seconds = seconds % 60   # Modulo operator to get the number of remaining seconds
         return '{:02d}'.format(int(minutes)), '{:02d}'.format(int(remaining_seconds))
-    # @core.timed_function(name="statcomp", dt=1.0)
-    # def statcomp(self):
-    #     self.loggedstuff.log(
-    #         traf.id,
-    #         traf.lat,
-    #         traf.lon,
-    #     )
-
-    #     return
