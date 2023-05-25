@@ -111,7 +111,6 @@ class DetectADSL(ConflictDetection):
         
         self.cpa_closest = np.full((traf.ntraf, traf.ntraf), 999)
         self.dist_closest = np.full((traf.ntraf, traf.ntraf), 999)
-        # self.cpa2_closest = np.pad(self.cpa2_closest, ((0, 1), (0, 1)), mode='constant', constant_values=1e9)
 
     def detect(self, ownship, intruder, rpz, hpz, dtlookahead):
         confpairs, lospairs, inconf, tcpamax, qdr, \
@@ -372,6 +371,13 @@ class DetectADSL(ConflictDetection):
         return confpairs, lospairs, inconf, tcpamax, \
             qdr[swconfl], dist[swconfl], np.sqrt(dcpa2[swconfl]), \
                 tcpa[swconfl], tinconf[swconfl], swlos, dist
+    
+    @stack.command(name='DETECT_USING_ADSL')
+    def set_use_adsl(self, cond: bool = True):
+        self.use_adsl = cond
+        stack.stack(f'ECHO Using_ADSL set to {self.use_adsl}')
+
+        return
 
     
     @stack.command(name='ECHO_ADSL')

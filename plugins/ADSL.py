@@ -334,6 +334,13 @@ class ADSL(ADSB):
         stack.stack(f'ECHO ADSL_HPOS_NOISE {self.hpos_noise_m}')
 
         return 
+
+    @stack.command(name='ADSL_DELAY_STDEV')
+    def set_adsl_delay_stdev(self, delay: float = 3):
+        self.comm_std_dev = delay
+        stack.stack(f'ECHO ADSL_DELAY_STDEV {self.comm_std_dev}')
+
+        return 
     
     @stack.command(name='ADSL_GS_NOISE')
     def get_full_info(self, gs_noise_ms: float = 1.5):
