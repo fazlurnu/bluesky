@@ -93,7 +93,7 @@ class ADSL(ADSB):
         # up = np.where(self.lastupdate + self.trunctime < sim.simt)
 
         if(self.comm_noise):
-            up = np.where(self.lastupdate >= sim.simt)
+            up = np.where(self.lastupdate > sim.simt)
             not_up = np.where(self.lastupdate <= sim.simt)
         else:
             up = np.array([True] * traf.ntraf)

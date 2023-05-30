@@ -373,8 +373,8 @@ class DetectADSL(ConflictDetection):
                 tcpa[swconfl], tinconf[swconfl], swlos, dist
     
     @stack.command(name='DETECT_USING_ADSL')
-    def set_use_adsl(self, cond: bool = True):
-        self.use_adsl = cond
+    def set_use_adsl(self, cond: int):
+        self.use_adsl = bool(cond)
         stack.stack(f'ECHO Using_ADSL set to {self.use_adsl}')
 
         return

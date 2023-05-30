@@ -51,14 +51,14 @@ class LoggingADSL(Entity):
         return dep_var_1, dep_var_2, dep_var_3
     
     @stack.command(name="LOGADSL")
-    def log_adsl(self, lookahead: int, rpz: float, hpos: float, use_adsl: bool, delay_stdev: float, dpsi_range):
+    def log_adsl(self, lookahead: int, rpz: float, hpos: float, use_adsl: int, delay_stdev: float, dpsi_range):
         log_folder = "/Users/sryhandiniputeri/bluesky/log/"
         str_lookahead = "DT_" + str(lookahead)
         str_rpz = "_RPZ_" + str(int(rpz*nm))
         str_hpos = "_hpos_" + str(hpos)
         str_use_adsl = "_adsl_" + str(use_adsl)
         str_adsl_stdev = "_stdev_" + str(delay_stdev)
-        str_dpsi_range = "_stdev_" + dpsi_range
+        str_dpsi_range = "_dpsi_" + dpsi_range
 
         self.log_dir = (log_folder + str_lookahead + str_rpz+str_hpos + str_use_adsl + str_adsl_stdev + str_dpsi_range)
         folder_exist = os.path.isdir(self.log_dir)
