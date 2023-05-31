@@ -45,6 +45,8 @@ class DetectADSL(ConflictDetection):
         # Conflicts and LoS detected in the current timestep (used for resolving)
         self.confpairs = list()
         self.lospairs = list()
+        self.lospairs_real = list()
+
         self.qdr = np.array([])
         self.dist = np.array([])
         self.dcpa = np.array([])
@@ -52,13 +54,18 @@ class DetectADSL(ConflictDetection):
         self.tLOS = np.array([])
         self.cpa_closest = np.array([])
         self.dist_closest = np.array([])
+
         # Unique conflicts and LoS in the current timestep (a, b) = (b, a)
         self.confpairs_unique = set()
+        self.confpairs_unique_real = set()
         self.lospairs_unique = set()
+        self.lospairs_unique_real = set()
 
         # All conflicts and LoS since simt=0
         self.confpairs_all = list()
         self.lospairs_all = list()
+        self.confpairs_all_real = list()
+        self.lospairs_all_real = list()
 
         #-------Variables with ADSL effect
         # Conflicts and LoS detected in the current timestep (used for resolving)
@@ -151,7 +158,7 @@ class DetectADSL(ConflictDetection):
         
 
     def update(self, ownship, intruder):
-        ''' Perform an update step of the Conflict Detection implementation. '''
+        ''' Perform an update step of the Conflict Detection implementation. '''        
         self.confpairs, self.lospairs, self.inconf, self.tcpamax, self.qdr, \
             self.dist, self.dcpa, self.tcpa, self.tLOS = \
                 self.detect(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
@@ -170,6 +177,26 @@ class DetectADSL(ConflictDetection):
         # Update confpairs_unique and lospairs_unique
         self.confpairs_unique = confpairs_unique
         self.lospairs_unique = lospairs_unique
+
+        # get the real metrics, instead of the measured one
+        confpairs, lospairs, inconf, tcpamax, qdr, \
+            dist, dcpa, tcpa, tLOS, swlos, cpa_all, dist_all = \
+                self.detect_ideal(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
+        
+                # confpairs has conflicts observed from both sides (a, b) and (b, a)
+        # confpairs_unique keeps only one of these
+        confpairs_unique_real = {frozenset(pair) for pair in confpairs}
+        lospairs_unique_real = {frozenset(pair) for pair in lospairs}
+
+        self.confpairs_all_real.extend(confpairs_unique_real - self.confpairs_unique_real)
+        self.lospairs_all_real.extend(lospairs_unique_real - self.lospairs_unique_real)
+
+        self.confpairs_all_real = list(set(self.confpairs_all_real))
+        self.lospairs_all_real = list(set(self.lospairs_all_real))
+
+        # Update confpairs_unique and lospairs_unique
+        self.confpairs_unique_real = confpairs_unique_real
+        self.lospairs_unique_real = lospairs_unique_real
 
     def detect_ideal(self, ownship, intruder, rpz, hpz, dtlookahead):
         ''' Conflict detection between ownship (traf) and intruder (traf/adsb).'''

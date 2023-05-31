@@ -38,7 +38,7 @@ def init_plugin():
 class LoggingADSL(Entity):
     def __init__(self):
         # log_header = "id,latitude,longitude,true_positive,false_positive,false_negative"
-        self.log_header = "simt,true_positive,false_positive,false_negative,rpz,dtlookahead,hpos_noise_m,nb_conf_total,nb_los_total"
+        self.log_header = "simt,true_positive,false_positive,false_negative,rpz,dtlookahead,hpos_noise_m,nb_conf_total_measured,nb_los_total_measured,nb_conf_total_real,nb_los_total_real"
         self.var_initiated = False
 
         super().__init__()
@@ -87,7 +87,9 @@ class LoggingADSL(Entity):
                 traf.cd.dtlookahead[0],
                 traf.adsb.hpos_noise_m,
                 len(traf.cd.confpairs_all),
-                len(traf.cd.lospairs_all)
+                len(traf.cd.lospairs_all),
+                len(traf.cd.confpairs_all_real),
+                len(traf.cd.lospairs_all_real)
             )
 
         return
@@ -96,15 +98,25 @@ class LoggingADSL(Entity):
     def log_cpa(self, scenario_name, rpz: float):
         cpa_los_sev = []
 
-        df_1 = pd.DataFrame(traf.cd.cpa_closest, index=traf.id, columns=traf.id)
+        df_1 = pd.DataFrame(traf.cd.dist_closest, index=traf.id, columns=traf.id)
 
         current_datetime = datetime.datetime.now()
         formatted_datetime = current_datetime.strftime("%Y_%m_%d_%H_%M_%S")
 
         dictionary_cpa = {(index, column): (rpz-value)/rpz*100 for index, row in df_1.iterrows() for column, value in row.items() if value < 100}
-        cpa_los_sev.extend(list(dictionary_cpa.values()))
+        values = list(dictionary_cpa.values())
+        keys = list(dictionary_cpa.keys())
 
-        df = pd.DataFrame({'cpa_los_sev': cpa_los_sev})
-        df.to_csv(f'{self.log_dir}/cpa_{scenario_name}_{formatted_datetime}.log')
+        df = pd.DataFrame({'los_sev_pair': keys, 'los_sev_val': values})
+
+        df.to_csv(f'{self.log_dir}/dist_{scenario_name}_{formatted_datetime}.log')
+
+        # df_1.to_csv(f'{self.log_dir}/dist_df_{scenario_name}_{formatted_datetime}.log')
+        
+        # df_2 = pd.DataFrame({'los_all': traf.cd.lospairs_all})
+        # df_2.to_csv(f'{self.log_dir}/los_all_{scenario_name}_{formatted_datetime}.log')
+
+        # df_3 = pd.DataFrame({'los_all_real': traf.cd.lospairs_all_real})
+        # df_3.to_csv(f'{self.log_dir}/los_all_real_{scenario_name}_{formatted_datetime}.log')
 
         stack.stack("ECHO LOGCPA CREATED")

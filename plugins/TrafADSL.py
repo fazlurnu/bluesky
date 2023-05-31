@@ -135,51 +135,6 @@ class TrafADSL(core.Entity):
         stack.stack(f'CRE {acid} {actype} {aclat} {aclon} {achdg} {altref / ft} {acspd / kts}')
         traf.ap.selaltcmd(len(traf.lat) - 1, altref, acvs)
         traf.vs[-1] = acvs
-
-    @stack.command(name='SPAWN_CONF_LOOKAHEAD')
-    def spawn_conf_lookahead(self, lat_input: float = 52, lon_input: float = 5, lookahead: float = 100):
-        lat1 = lat_input
-        lon1 = lon_input
-
-        max_speed = 25 * kts # m/s
-        dist = (2*lookahead*max_speed)/1000
-
-        for j in range(20):
-            for i in range(20):
-                lat2, lon2 = self.km_to_lat_lon(lat1, lon1, dist)
-                dlat = lat2 - lat1
-                dlon = lon2 - lon1
-
-                # box_id = 'B' + '{:04d}'.format(self.box_counter)
-                # stack.stack(f'BOX {box_id} {lat1} {lon1} {lat2} {lon2}')
-                # self.box_counter += 1
-                
-                ac_lat = lat1 + 0.1*dlat
-                ac_lon = lon1 + 0.5*dlon
-                hdg = 0
-                alt_def = 100
-                spd = 25
-
-                self.ac_counter += 1
-                drone_id = "DR" + "{0:03}".format(self.ac_counter)
-
-                stack.stack(f'CRE {drone_id} M600 {ac_lat} {ac_lon} {hdg} {alt_def} {spd}')
-
-                self.ac_counter += 1
-                drone_id_conf = "DR" + "{0:03}".format(self.ac_counter)
-                dpsi = random.uniform(10, 350)
-                dcpa = random.uniform(0, 30 / nm) # m
-                tlosh = random.uniform(lookahead*0.9, lookahead*1.1)
-                # spd_intruder = random.uniform(15, 35)
-
-                stack.stack(f'CRECONFSADSL {drone_id_conf} M600 {drone_id} {dpsi} {dcpa} {tlosh} {spd}')
-
-                lon1 = lon2
-
-            lon1 = lon_input
-            lat1 = lat2
-        
-        return True
     
     @stack.command(name = "CRE_BATCH_CONF_ADSL")
     def cre_batch(self, lat: float = 52.5, lon: float = 5.3, nb_scen: int = 20):
@@ -196,9 +151,11 @@ class TrafADSL(core.Entity):
 
         list_use_adsl = [False]
         list_adsl_stdev = [0.0, 3.0]
-        list_hpos = [15]
-        list_dt_lookahead = [6, 15, 50, 100]
+        # list_hpos = [1.5, 5.0, 15.0]
+        list_hpos = [15.0]
+        list_dt_lookahead = [15]
         list_rpz = [30, 50]
+        # list_dpsi_range = ['1', '2', '3', '4', '5', '6', '7', '8']
         list_dpsi_range = ['0']
     
         for hpos in list_hpos:
@@ -213,7 +170,7 @@ class TrafADSL(core.Entity):
                 for rpz in list_rpz:
                     for dpsi_range in list_dpsi_range:
                         for i in range(int(nb_scen)):
-                            (created_scenarios) = self.cre_scen(dt_lookahead, rpz, hpos, dpsi_range, lat, lon, i)
+                            created_scenarios = self.cre_scen(dt_lookahead, rpz, hpos, dpsi_range, lat, lon, i)
                             
                             for created_scen in created_scenarios:
                                 scenario_number += 1
@@ -247,7 +204,7 @@ class TrafADSL(core.Entity):
         dpsi_dict = {'0': [10, 350],
                      '1': [10, 45], '2': [45, 90], '3': [90, 135], '4': [135, 180],
                      '5': [180, 225], '6': [225, 270], '7': [270, 315], '8': [315, 350]}
-        
+
         lower_dpsi = dpsi_dict[dpsi_range][0]
         upper_dpsi = dpsi_dict[dpsi_range][1]
 
@@ -256,76 +213,52 @@ class TrafADSL(core.Entity):
 
         scenario_path = f'/Users/sryhandiniputeri/bluesky/scenario/'
 
+        filename_list = []
         filename_base = f'certiflight_dt_{dt_lookahead}_rpz_{int(rpz)}_hpos_{hpos}_dpsi_range_{dpsi_range}'
-        filename_adsl_false_0 = f'_adsl_{False}_delstdev_{0.0}_{index}.scn'
-        filename_adsl_true_0 = f'_adsl_{True}_delstdev_{0.0}_{index}.scn'
-        filename_adsl_true_3 = f'_adsl_{True}_delstdev_{3.0}_{index}.scn'
 
-        fullname_adsl_false_0 = scenario_path + filename_base + filename_adsl_false_0
-        fullname_adsl_true_0 = scenario_path + filename_base + filename_adsl_true_0
-        fullname_adsl_true_3 = scenario_path + filename_base + filename_adsl_true_3
+        # adsl_pair = [(0, 0.0), (1, 0.0), (1, 3.0), (1, 5.0), (1, 10.0), (1, 15.0)]
+        adsl_pair = [(1, 3.0)]
 
-        scenario_title_list = [fullname_adsl_false_0, fullname_adsl_true_0, fullname_adsl_true_3]
+        for adsl in adsl_pair:
+            filename_adsl = f'_adsl_{adsl[0]}_delstdev_{adsl[1]}_{index}.scn'
+            fullname_adsl = scenario_path + filename_base + filename_adsl
+            filename_list.append(fullname_adsl)
 
-        for scenario in scenario_title_list:
-            if os.path.exists(scenario):
-                os.remove(scenario)
+            if os.path.exists(fullname_adsl):
+                os.remove(fullname_adsl)
 
-        # set for adsl_false_0
-        set_detect_mode = f'00:00:00.00>ASAS DETECTADSL'
-        set_use_adsl = f'00:00:00.00>DETECT_USING_ADSL {0}'
-        set_lookahead = f'00:00:00.00>DTLOOK {dt_lookahead}'
-        set_rpz = f'00:00:00.00>RPZ {rpz_in_nm}'
-        set_detect = f'{set_detect_mode}\n{set_use_adsl}\n{set_lookahead}\n{set_rpz}\n'
+            # set for adsl_false_0
+            set_detect_mode = f'00:00:00.00>ASAS DETECTADSL'
+            set_use_adsl = f'00:00:00.00>DETECT_USING_ADSL {adsl[0]}'
+            set_lookahead = f'00:00:00.00>DTLOOK {dt_lookahead}'
+            set_rpz = f'00:00:00.00>RPZ {rpz_in_nm}'
+            set_detect = f'{set_detect_mode}\n{set_use_adsl}\n{set_lookahead}\n{set_rpz}\n'
 
-        set_adsl_1 = f'00:00:00.00>NOISE ON'
-        set_adsl_2 = f'00:00:00.00>IMPL ADSB ADSL'
-        set_adsl_3 = f'00:00:00.00>ADSL_HPOS_NOISE {hpos}'
-        set_adsl_4 = f'00:00:00.00>ADSL_DELAY_STDEV {0.0}'
-        set_adsl = f'{set_adsl_1}\n{set_adsl_2}\n{set_adsl_3}\n{set_adsl_4}\n'
+            set_adsl_1 = f'00:00:00.00>NOISE ON'
+            set_adsl_2 = f'00:00:00.00>IMPL ADSB ADSL'
+            set_adsl_3 = f'00:00:00.00>ADSL_HPOS_NOISE {hpos}'
+            set_adsl_4 = f'00:00:00.00>ADSL_DELAY_STDEV {adsl[1]}'
+            set_adsl = f'{set_adsl_1}\n{set_adsl_2}\n{set_adsl_3}\n{set_adsl_4}\n'
 
-        
-        set_reso = f'00:00:00.00>RESO MVP'
+            
+            set_reso = f'00:00:00.00>RESO MVP'
 
-        set_log = f'00:00:00.00>LOGADSL {dt_lookahead} {rpz_in_nm} {hpos} {0} {0.0} {dpsi_range}'
+            set_log = f'00:00:00.00>LOGADSL {dt_lookahead} {rpz_in_nm} {hpos} {adsl[0]} {adsl[1]} {dpsi_range}'
 
 
-        file_adsl_false_0 = open(fullname_adsl_false_0, "a")
-        file_adsl_false_0.write(f'{set_detect}\n{set_adsl}\n{set_reso}\n{set_log}\n')
-
-        # set for adsl_true_0
-        set_use_adsl = f'00:00:00.00>DETECT_USING_ADSL {1}'
-        set_detect = f'{set_detect_mode}\n{set_use_adsl}\n{set_lookahead}\n{set_rpz}\n'
-
-        set_adsl_4 = f'00:00:00.00>ADSL_DELAY_STDEV {0.0}'
-        set_adsl = f'{set_adsl_1}\n{set_adsl_2}\n{set_adsl_3}\n{set_adsl_4}\n'
-        
-        set_log = f'00:00:00.00>LOGADSL {dt_lookahead} {rpz_in_nm} {hpos} {1} {0.0} {dpsi_range}'
-
-
-        file_adsl_true_0 = open(fullname_adsl_true_0, "a")
-        file_adsl_true_0.write(f'{set_detect}\n{set_adsl}\n{set_reso}\n{set_log}\n')
-
-        # set for adsl_true_3
-        set_use_adsl = f'00:00:00.00>DETECT_USING_ADSL {1}'
-        set_detect = f'{set_detect_mode}\n{set_use_adsl}\n{set_lookahead}\n{set_rpz}\n'
-
-        set_adsl_4 = f'00:00:00.00>ADSL_DELAY_STDEV {3.0}'
-        set_adsl = f'{set_adsl_1}\n{set_adsl_2}\n{set_adsl_3}\n{set_adsl_4}\n'
-        
-        set_log = f'00:00:00.00>LOGADSL {dt_lookahead} {rpz_in_nm} {hpos} {1} {3.0} {dpsi_range}'
-
-
-        file_adsl_true_3 = open(fullname_adsl_true_3, "a")
-        file_adsl_true_3.write(f'{set_detect}\n{set_adsl}\n{set_reso}\n{set_log}\n')
+            file = open(fullname_adsl, "a")
+            file.write(f'{set_detect}\n{set_adsl}\n{set_reso}\n{set_log}\n')
+            file.close()
     
         #######
 
         self.ac_counter = 0
         self.box_counter = 0
 
-        for j in range(20):
-            for i in range(20):
+        nb_of_conflict = 5
+
+        for j in range(nb_of_conflict):
+            for i in range(nb_of_conflict):
                 lat2, lon2 = self.km_to_lat_lon(lat1, lon1, dist)
                 dlat = lat2 - lat1
                 dlon = lon2 - lon1
@@ -353,25 +286,20 @@ class TrafADSL(core.Entity):
 
                 create_conflict_drone = f'00:00:00.00>CRECONFSADSL {drone_id_conf} M600 {drone_id} {dpsi} {dcpa} {tlosh} {spd_intruder}'
 
-                file_adsl_false_0.write(f'{create_drone}\n{create_conflict_drone}\n')
-                file_adsl_true_0.write(f'{create_drone}\n{create_conflict_drone}\n')
-                file_adsl_true_3.write(f'{create_drone}\n{create_conflict_drone}\n')
+                for filename in filename_list:
+                    file = open(filename, "a")
+                    file.write(f'{create_drone}\n{create_conflict_drone}\n')
+                    file.close()
 
                 lon1 = lon2
 
             lon1 = lon
             lat1 = lat2
-            
-        
-        file_adsl_false_0.close()
-        file_adsl_true_0.close()
-        file_adsl_true_3.close()
 
-        stack.stack(f'ECHO Scenario Created {fullname_adsl_false_0}')
-        stack.stack(f'ECHO Scenario Created {fullname_adsl_true_0}')
-        stack.stack(f'ECHO Scenario Created {fullname_adsl_true_3}')
+        stack.stack(f'ECHO {len(filename_list)} scenarios created')
 
-        return fullname_adsl_false_0, fullname_adsl_true_0, fullname_adsl_true_3
+        return filename_list
+        # return fullname_adsl_true_3
     
     def km_to_lat_lon(self,
         latitude = 52.0, longitude = 5.0, distance = 1.0
