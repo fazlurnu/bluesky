@@ -4,10 +4,9 @@ from bluesky import stack, settings, traf
 from bluesky.tools import geo
 from bluesky.tools.aero import nm, ft
 from bluesky.traffic.asas import ConflictDetection
+import bluesky as bs
 
 from math import radians, degrees, cos, sin, sqrt
-
-from .ADSL import ADSL
 
 def init_plugin():
     ''' Plugin initialisation function. '''
@@ -66,23 +65,6 @@ class DetectADSL(ConflictDetection):
         self.lospairs_all = list()
         self.confpairs_all_real = list()
         self.lospairs_all_real = list()
-
-        #-------Variables with ADSL effect
-        # Conflicts and LoS detected in the current timestep (used for resolving)
-        self.confpairs_adsl = list()
-        self.lospairs_adsl = list()
-        self.qdr_adsl = np.array([])
-        self.dist_adsl = np.array([])
-        self.dcpa_adsl = np.array([])
-        self.tcpa_adsl = np.array([])
-        self.tLOS_adsl = np.array([])
-        # Unique conflicts and LoS in the current timestep (a, b) = (b, a)
-        self.confpairs_unique_adsl = set()
-        self.lospairs_unique_adsl = set()
-
-        # All conflicts and LoS since simt=0
-        self.confpairs_all_adsl = list()
-        self.lospairs_all_adsl = list()
         
         # Per-aircraft conflict data
         with self.settrafarrays():
@@ -95,9 +77,6 @@ class DetectADSL(ConflictDetection):
             # [s] lookahead time
             self.dtlookahead = np.array([])
             self.dtnolook = np.array([])
-
-            self.inconf_adsl = np.array([], dtype=bool)  # In-conflict flag
-            self.tcpamax_adsl = np.array([]) # Maximum time to CPA for aircraft in conflict
 
         self.nb_true_positive = 0
         self.nb_false_positive = 0
@@ -183,7 +162,7 @@ class DetectADSL(ConflictDetection):
             dist, dcpa, tcpa, tLOS, swlos, cpa_all, dist_all = \
                 self.detect_ideal(ownship, intruder, self.rpz, self.hpz, self.dtlookahead)
         
-                # confpairs has conflicts observed from both sides (a, b) and (b, a)
+        # confpairs has conflicts observed from both sides (a, b) and (b, a)
         # confpairs_unique keeps only one of these
         confpairs_unique_real = {frozenset(pair) for pair in confpairs}
         lospairs_unique_real = {frozenset(pair) for pair in lospairs}
@@ -197,6 +176,36 @@ class DetectADSL(ConflictDetection):
         # Update confpairs_unique and lospairs_unique
         self.confpairs_unique_real = confpairs_unique_real
         self.lospairs_unique_real = lospairs_unique_real
+
+    def reset(self):
+        super().reset()
+        self.clearconfdb()
+        self.confpairs_all.clear()
+        self.lospairs_all.clear()
+        self.confpairs_all_real.clear()
+        self.lospairs_all_real.clear()
+        self.rpz_def = bs.settings.asas_pzr * nm
+        self.hpz_def = bs.settings.asas_pzh * ft
+        self.dtlookahead_def = bs.settings.asas_dtlookahead
+        self.dtnolook_def = 0.0
+        self.global_rpz = self.global_hpz = True
+        self.global_dtlook = self.global_dtnolook = True
+
+    def clearconfdb(self):
+        ''' Clear conflict database. '''
+        self.confpairs_unique.clear()
+        self.lospairs_unique.clear()
+        self.confpairs_unique_real.clear()
+        self.lospairs_unique_real.clear()
+        self.confpairs.clear()
+        self.lospairs.clear()
+        self.qdr = np.array([])
+        self.dist = np.array([])
+        self.dcpa = np.array([])
+        self.tcpa = np.array([])
+        self.tLOS = np.array([])
+        self.inconf = np.zeros(bs.traf.ntraf)
+        self.tcpamax = np.zeros(bs.traf.ntraf)
 
     def detect_ideal(self, ownship, intruder, rpz, hpz, dtlookahead):
         ''' Conflict detection between ownship (traf) and intruder (traf/adsb).'''
@@ -405,7 +414,6 @@ class DetectADSL(ConflictDetection):
         stack.stack(f'ECHO Using_ADSL set to {self.use_adsl}')
 
         return
-
     
     @stack.command(name='ECHO_ADSL')
     def echo_adsl(self):
@@ -420,15 +428,3 @@ class DetectADSL(ConflictDetection):
     @stack.command(name='SET_RPZ')
     def set_rpz(self):
         self.rpz = np.array([30, 30])
-
-    def lat_diff_to_km(self, lat1, lat2):
-        return abs(lat2 - lat1) * 111.32
-    
-    def km_to_lat(self, km):
-        return km / 111.32
-    
-    def km_to_lon(self, distance, latitude):
-        return distance / (111.32 * np.cos(np.radians(latitude)))
-    
-    def lon_diff_to_km(self, lon1, lon2, lat1):
-        return abs(lon2 - lon1) * 111.32 * cos(radians(lat1))

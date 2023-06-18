@@ -9,6 +9,7 @@ from bluesky import core, stack, traf, sim  #, settings, navdb, sim, scr, tools
 from bluesky.tools.aero import ft
 
 from bluesky.traffic import ADSB
+from scipy.stats import halfnorm
 
 ### Initialization function of your plugin. Do not change the name of this
 ### function, as it is the way BlueSky recognises this file as a plugin.
@@ -57,7 +58,9 @@ class ADSL(ADSB):
         self.set_comm_parameter(False, False)
 
         self.comm_noise = True
-        self.comm_std_dev = 3
+        self.comm_std_dev = 5
+
+        self.time_elapsed_total = []
 
     def setnoise(self, n):
         self.set_nav_noise(n)
@@ -77,7 +80,7 @@ class ADSL(ADSB):
         super().create(n)
         
         # self.lastupdate[-n:] = -self.trunctime * np.random.rand(n)
-        self.lastupdate[-n:] = np.random.normal(0, self.comm_std_dev)
+        self.lastupdate[-n:] = np.random.normal(0, self.comm_std_dev) # add sim.simt here because ac can be spawned at any sim.simt time
         self.lat[-n:] = traf.lat[-n:]
         self.lon[-n:] = traf.lon[-n:]
         self.alt[-n:] = traf.alt[-n:]
@@ -93,16 +96,19 @@ class ADSL(ADSB):
         # up = np.where(self.lastupdate + self.trunctime < sim.simt)
 
         if(self.comm_noise):
-            up = np.where(self.lastupdate > sim.simt)
-            not_up = np.where(self.lastupdate <= sim.simt)
+            time_elapsed = sim.simt - self.lastupdate
+            update_prob = halfnorm.cdf(time_elapsed, loc=0, scale=self.comm_std_dev)
+            up = np.where(np.random.random(size = traf.ntraf) < update_prob)
         else:
             up = np.array([True] * traf.ntraf)
 
         nup = len(up)
         
         if self.nav_noise:
-            self.lat[up] = traf.lat[up] + np.random.normal(0, self.km_to_lat(self.hpos_noise_m/1000), nup)
-            self.lon[up] = traf.lon[up] + np.random.normal(0, self.km_to_lat(self.hpos_noise_m/1000), nup)
+            delta_lat, delta_lon = self.get_lat_lon_noise(self.hpos_noise_m, self.lat, self.lon, up)
+            self.lat[up] += delta_lat
+            self.lon[up] += delta_lon
+
             self.gs[up] = traf.gs[up] + np.random.normal(0, self.gs_noise_ms, nup)
         else:
             self.lat[up] = traf.lat[up]
@@ -116,11 +122,12 @@ class ADSL(ADSB):
         self.tas[up] = traf.tas[up]
         self.vs[up]  = traf.vs[up]
 
-        if(self.comm_noise):
-            self.lastupdate[up] = sim.simt + abs(np.random.normal(0, self.comm_std_dev, size = len(self.lastupdate[up])))
-            self.lastupdate[not_up] += abs(np.random.normal(0, self.comm_std_dev, size = len(self.lastupdate[not_up])))
-        else:
-            self.lastupdate[up] = sim.simt
+        self.lastupdate[up] = sim.simt
+        self.time_elapsed_total.extend(time_elapsed[up])
+
+    def reset(self):
+        super().reset()
+        self.time_elapsed_total.clear()
 
     def is_drone(self, ac_type):
         drone_list = ["M600", "Amzn", "Mnet", "Phan4", "M100", "M200", "Mavic", "Horsefly"]
@@ -295,38 +302,18 @@ class ADSL(ADSB):
         sfinal = f'{s1}\n{s2}\n{s3}\n{s4}\n{s5}\n{s6}\n{s7}'
 
         return True, sfinal
-    
-    def add_noise_lat_lon(self,
-        latitude: float, longitude: float, noise_lat: float, noise_lon: float
-    ):        
-        lat1 = radians(latitude)
-        lon1 = radians(longitude)
 
-        # calculate the change in latitude and longitude
-        dlat = noise_lat / self.R
-        dlon = noise_lon / (self.R * cos(lat1))
+    def get_lat_lon_noise(self, stdev, lat_ref, lon_ref, up):
+        nb = len(up[0])
 
-        # convert back to degrees
-        lat2 = lat1 + dlat
-        lon2 = lon1 + dlon
+        angles_rad = np.random.uniform(0, 2*np.pi, size = nb)
+        distance = np.random.normal(0, stdev, size = nb) / 1000 #km
+        
+        delta_lat = distance * np.sin(angles_rad) / 110.574
+        delta_lon = distance * np.cos(angles_rad) / (111.320*np.cos(np.radians(lat_ref[up])))
+        
+        return delta_lat, delta_lon
 
-        # convert back to decimal degrees
-        lat2 = degrees(lat2)
-        lon2 = degrees(lon2)
-
-        return lat2, lon2
-
-    def lat_diff_to_km(self, lat1, lat2):
-        return abs(lat2 - lat1) * 111.32
-    
-    def km_to_lat(self, km):
-        return km / 111.32
-    
-    def km_to_lon(self, distance, latitude):
-        return distance / (111.32 * np.cos(np.radians(latitude)))
-    
-    def lon_diff_to_km(self, lon1, lon2, lat1):
-        return abs(lon2 - lon1) * 111.32 * cos(radians(lat1))
 
     @stack.command(name='ADSL_HPOS_NOISE')
     def set_adsl_hpos_noise(self, hpos_noise: float = 1.5):
@@ -336,7 +323,7 @@ class ADSL(ADSB):
         return 
 
     @stack.command(name='ADSL_DELAY_STDEV')
-    def set_adsl_delay_stdev(self, delay: float = 3):
+    def set_adsl_delay_stdev(self, delay: float = 5):
         self.comm_std_dev = delay
         stack.stack(f'ECHO ADSL_DELAY_STDEV {self.comm_std_dev}')
 
@@ -347,26 +334,4 @@ class ADSL(ADSB):
         self.gs_noise_ms = gs_noise_ms #m
 
         return 
-    
-    # @core.timed_function(name='POS_NOISE', dt=1)
-    # def get_pos_noise(self, acid: 'acid'):
-    #     s1 = f'Info on {traf.id[acid]} {traf.type[acid]}'
-        
-    #     s2 = f'Pos: {traf.lat[acid]} {traf.lon[acid]}'
-
-    #     mu_lat = traf.lat[acid]
-    #     mu_lon = traf.lon[acid]
-    #     sigma = 15/1000 #km, this is one standard deviation. 95% of the data will lies within two stdev.
-
-    #     lat_noise, lon_noise = self.add_noise_lat_lon(traf.lat[acid], traf.lon[acid], random.gauss(0, sigma), random.gauss(0, sigma))
-
-    #     s3 = f'Pos Noise: {lat_noise} {lon_noise}'
-
-    #     lat_diff_km = self.lat_diff_to_km(traf.lat[acid], lat_noise)
-    #     lon_diff_km = self.lon_diff_to_km(traf.lon[acid], lon_noise, traf.lat[acid])
-
-    #     s4 = f'Pos Diff m: {lat_diff_km*1000} {lon_diff_km*1000}'
-    #     sfinal = f'{s1}\n{s2}\n{s3}\n{s4}'
-
-    #     return True, sfinal    
     

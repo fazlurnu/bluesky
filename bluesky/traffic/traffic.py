@@ -400,7 +400,7 @@ class Traffic(Entity):
         self.p, self.rho, self.Temp = vatmos(self.alt)
 
         #---------- ADSB Update -------------------------------
-        self.adsb.update()
+        # self.adsb.update()
 
         #---------- Fly the Aircraft --------------------------
         self.ap.update()  # Autopilot logic
@@ -432,6 +432,7 @@ class Traffic(Entity):
     @timed_function(name='asas', dt=bs.settings.asas_dt, manual=True)
     def update_asas(self):
         # Conflict detection and resolution
+        self.adsb.update()
         self.cd.update(self, self)
         self.cr.update(self.cd, self, self)
 

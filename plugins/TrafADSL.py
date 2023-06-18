@@ -153,8 +153,8 @@ class TrafADSL(core.Entity):
         list_adsl_stdev = [0.0, 3.0]
         # list_hpos = [1.5, 5.0, 15.0]
         list_hpos = [15.0]
-        list_dt_lookahead = [15]
-        list_rpz = [30, 50]
+        list_dt_lookahead = [6]
+        list_rpz = [50]
         # list_dpsi_range = ['1', '2', '3', '4', '5', '6', '7', '8']
         list_dpsi_range = ['0']
     
@@ -216,8 +216,8 @@ class TrafADSL(core.Entity):
         filename_list = []
         filename_base = f'certiflight_dt_{dt_lookahead}_rpz_{int(rpz)}_hpos_{hpos}_dpsi_range_{dpsi_range}'
 
-        # adsl_pair = [(0, 0.0), (1, 0.0), (1, 3.0), (1, 5.0), (1, 10.0), (1, 15.0)]
-        adsl_pair = [(1, 3.0)]
+        adsl_pair = [(1, 5.0)]
+        # adsl_pair = [(1, 3.0)]
 
         for adsl in adsl_pair:
             filename_adsl = f'_adsl_{adsl[0]}_delstdev_{adsl[1]}_{index}.scn'
@@ -255,7 +255,7 @@ class TrafADSL(core.Entity):
         self.ac_counter = 0
         self.box_counter = 0
 
-        nb_of_conflict = 5
+        nb_of_conflict = 20
 
         for j in range(nb_of_conflict):
             for i in range(nb_of_conflict):

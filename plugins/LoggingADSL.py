@@ -119,4 +119,18 @@ class LoggingADSL(Entity):
         # df_3 = pd.DataFrame({'los_all_real': traf.cd.lospairs_all_real})
         # df_3.to_csv(f'{self.log_dir}/los_all_real_{scenario_name}_{formatted_datetime}.log')
 
+        # print(traf.adsb.comm_std_dev)
+
+        if(len(traf.adsb.time_elapsed_total) > 0):
+            up3 = np.where(np.array(traf.adsb.time_elapsed_total) <= 3)
+            up5 = np.where(np.array(traf.adsb.time_elapsed_total) <= 5)
+            percentage_under_3s = len(up3[0])/len(traf.adsb.time_elapsed_total)*100
+            percentage_under_5s = len(up5[0])/len(traf.adsb.time_elapsed_total)*100
+
+            pd.DataFrame({'los_sev_pair': keys, 'los_sev_val': values})
+            df_comm_delay = pd.DataFrame({'sent_under_3s': [percentage_under_3s], 'sent_under_5s': [percentage_under_5s]})
+            df_comm_delay.to_csv(f'{self.log_dir}/comm_delay_{scenario_name}_{formatted_datetime}.log')
+
+            print(percentage_under_3s, percentage_under_5s)
+
         stack.stack("ECHO LOGCPA CREATED")
