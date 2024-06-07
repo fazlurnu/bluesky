@@ -60,7 +60,7 @@ class ADSL(ADSB):
         self.set_nav_noise(True)
         
         self.comm_noise = True
-        self.update_prob = 0.6
+        self.update_prob = 1.0
         self.update_period = 1 #second
         self.comm_std_dev = 5
 
@@ -72,8 +72,8 @@ class ADSL(ADSB):
 
     def set_nav_noise(self, cond):
         self.nav_noise = cond
-        self.hpos_noise_m = 15.0 # in meter, one standard deviation
-        self.gs_noise_ms = 1.5 # in m/s, one standard deviation
+        self.hpos_noise_m = 15 # in meter, one standard deviation
+        self.gs_noise_ms = 0.0 # in m/s, one standard deviation
 
     def set_comm_parameter(self, cond_trunc, cond_reso):
         self.comm_trunc = cond_trunc
@@ -107,6 +107,7 @@ class ADSL(ADSB):
 
             time_cond = time_elapsed >= self.update_period
             update_prob_cond = np.random.random(size = traf.ntraf) <= update_prob
+            # update_prob_cond = np.random.randint(1, 2, size = traf.ntraf) <= update_prob
             
             up = np.where(time_cond & update_prob_cond)
 
@@ -121,8 +122,13 @@ class ADSL(ADSB):
             self.lat[up] = traf.lat[up] + self.noise_lat[up]
             self.lon[up] = traf.lon[up] + self.noise_lon[up]
 
+            # self.lat[up] = traf.lat[up]
+            # self.lon[up] = traf.lon[up]
+
             self.noise_gs = np.random.normal(0, self.gs_noise_ms, traf.ntraf)
             self.gs[up] = traf.gs[up] + self.noise_gs[up]
+
+            # self.gs[up] = traf.gs[up]
 
             # stack.stack("ECHO noise_lat: {}".format(self.noise_lat))
 
