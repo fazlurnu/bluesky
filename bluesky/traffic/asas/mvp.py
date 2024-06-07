@@ -296,8 +296,10 @@ class MVP(ConflictResolution):
 
         # Exception handlers for head-on conflicts
         # This is done to prevent division by zero in the next step
-        if dabsH <= 10.:
-            dabsH = 10.
+        threshold = 0.001
+        
+        if dabsH <= threshold:
+            dabsH = threshold
             dcpa[0] = drel[1] / dist * dabsH
             dcpa[1] = -drel[0] / dist * dabsH
 
