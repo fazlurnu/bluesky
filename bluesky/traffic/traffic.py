@@ -375,6 +375,62 @@ class Traffic(Entity):
         self.ap.selaltcmd(len(self.lat) - 1, altref, acvs)
         self.vs[-1] = acvs
 
+    def creconfs_dist(self, acid, actype, targetidx, dpsi, dcpa, dist, dH=None, tlosv=None, spd=None):
+        ''' Create an aircraft in conflict with target aircraft, specifying initial distance.
+
+            Arguments:
+            - acid: callsign of new aircraft
+            - actype: aircraft type of new aircraft
+            - targetidx: id (callsign) of target aircraft
+            - dpsi: Conflict angle (angle between tracks of ownship and intruder) (deg)
+            - dcpa: Predicted distance at closest point of approach (NM)
+            - dist: Initial distance between aircraft at creation (NM)
+            - dH: Vertical distance (ft)
+            - tlosv: Vertical time to loss of separation
+            - spd: Speed of new aircraft (CAS/Mach, kts/-)
+        '''
+        trkref = radians(self.trk[targetidx])
+        gsref  = self.gs[targetidx]   # m/s
+        altref = self.alt[targetidx]  # m
+        trk    = trkref + radians(dpsi)
+
+        if spd:
+            tas  = casormach2tas(spd, altref)
+            gsn  = tas * cos(trk)
+            gse  = tas * sin(trk)
+            # apply wind correction at target position (same approximation as creconfs)
+            wn, we = self.wind.getdata(self.lat[targetidx], self.lon[targetidx], altref)
+            gsn += wn
+            gse += we
+        else:
+            gsn = gsref * cos(trk)
+            gse = gsref * sin(trk)
+
+        vreln = gsref * cos(trkref) - gsn
+        vrele = gsref * sin(trkref) - gse
+        vrel  = sqrt(vreln * vreln + vrele * vrele)
+
+        dist_m = dist * nm
+        cpa_m  = dcpa * nm
+        pzr    = bs.settings.asas_pzr * nm
+
+        # Longitudinal distance from intruder to CPA
+        drelcpa = sqrt(max(dist_m * dist_m - cpa_m * cpa_m, 0.0))
+        # creconfs adds sqrt(pzr²-cpa²) on top of tlosh*vrel when cpa < pzr;
+        # subtract that correction so the round-trip gives the requested dist
+        pzr_correction = 0.0 if cpa_m > pzr else sqrt(pzr * pzr - cpa_m * cpa_m)
+        tlosh_vrel = max(drelcpa - pzr_correction, 0.0)
+
+        # Derive horizontal time to loss of separation from initial distance
+        if vrel < 0.5:
+            # No meaningful relative motion — place aircraft at given distance
+            # with tlosh such that conflict is nominally far in the future
+            tlosh = tlosh_vrel / 0.5
+        else:
+            tlosh = tlosh_vrel / vrel
+
+        self.creconfs(acid, actype, targetidx, dpsi, dcpa, tlosh, dH, tlosv, spd)
+
     def delete(self, idx):
         """Delete an aircraft"""
         # If this is a multiple delete, sort first for list delete
