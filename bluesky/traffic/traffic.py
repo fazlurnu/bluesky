@@ -106,6 +106,11 @@ class Traffic(Entity):
             # Acceleration
             self.ax = np.array([])  # [m/s2] current longitudinal acceleration
 
+            # Turn rate limiter
+            self.prev_turnrate = np.array([])  # [deg/s] turn rate at previous timestep
+            self.max_tr        = np.array([])  # [deg/s] max turn rate (np.inf = no limit)
+            self.max_dtr2      = np.array([])  # [deg/s²] max turn acceleration (np.inf = no limit)
+
             # Atmosphere
             self.p       = np.array([])  # air pressure [N/m2]
             self.rho     = np.array([])  # air density [kg/m3]
@@ -276,6 +281,13 @@ class Traffic(Entity):
         # Miscallaneous
         self.coslat[-n:] = np.cos(np.radians(aclat))  # Cosine of latitude for flat-earth aproximations
         self.eps[-n:] = 0.01
+
+        # Turn rate limiter: set limits per aircraft type (inf = unconstrained)
+        type_arr = np.char.upper(np.array(self.type[-n:], dtype=str))
+        m600_mask = (type_arr == "M600")
+        self.max_tr[-n:]        = np.where(m600_mask, 15.0, np.inf)  # [deg/s]
+        self.max_dtr2[-n:]      = np.where(m600_mask, 10.0, np.inf)  # [deg/s²]
+        self.prev_turnrate[-n:] = 0.0
 
         # Finally call create for child TrafficArrays. This only needs to be done
         # manually in Traffic.
@@ -496,18 +508,32 @@ class Traffic(Entity):
         self.cas = vtas2cas(self.tas, self.alt)
         self.M = vtas2mach(self.tas, self.alt)
 
-        # Turning bank triangle
-        # tan phi = a centrigugal/a grav = omega^2 * R / g = omega * V /g
-        # => omega = (g tan phi)/V
-        turnrate = np.degrees(g0 * np.tan(np.where(self.ap.turnphi>self.eps*self.eps,
-                                                   self.ap.turnphi,self.ap.bankdef)) \
-                                          / np.maximum(self.tas, self.eps))
-        delhdg = (self.aporasas.hdg - self.hdg + 180) % 360 - 180  # [deg]
-        self.swhdgsel = np.abs(delhdg) > np.abs(bs.sim.simdt * turnrate)
+        dt = bs.sim.simdt
+        hdg_err = (self.aporasas.hdg - self.hdg + 180.0) % 360.0 - 180.0  # [deg], signed
 
-        # Update heading
-        self.hdg = np.where(self.swhdgsel, 
-                            self.hdg + bs.sim.simdt * turnrate * np.sign(delhdg), self.aporasas.hdg) % 360.0
+        # Rate-limited turn rate for aircraft with a turn rate limiter (e.g. M600)
+        trlim_mask      = np.isfinite(self.max_tr)
+        prev_tr         = self.prev_turnrate
+        raw_tr          = np.clip(hdg_err, -self.max_tr, self.max_tr)    # desired turn rate [deg/s]
+        tr_step_needed  = raw_tr - prev_tr                                # [deg/s]
+        tr_step_max     = self.max_dtr2 * dt                              # [deg/s] allowed change this step
+        tr_step_limited = np.clip(tr_step_needed, -tr_step_max, tr_step_max)
+        limited_tr      = np.clip(prev_tr + tr_step_limited, -self.max_tr, self.max_tr)  # [deg/s]
+
+        # Bank-angle turn rate for unconstrained aircraft (tan phi = omega*V/g), with sign
+        default_tr = np.sign(hdg_err) * np.degrees(
+            g0 * np.tan(np.where(self.ap.turnphi > self.eps * self.eps,
+                                 self.ap.turnphi, self.ap.bankdef))
+            / np.maximum(self.tas, self.eps)
+        )
+
+        turnrate = np.where(trlim_mask, limited_tr, default_tr)  # [deg/s], signed
+        self.prev_turnrate = np.where(trlim_mask, turnrate, 0.0)
+
+        self.swhdgsel = np.abs(hdg_err) > np.abs(dt * turnrate)
+        self.hdg = np.where(self.swhdgsel,
+                            (self.hdg + dt * turnrate),
+                            self.aporasas.hdg) % 360.0
 
         # Update vertical speed (alt select, capture and hold autopilot mode)
         delta_alt = self.aporasas.alt - self.alt
@@ -818,6 +844,19 @@ class Traffic(Entity):
             self.ap.bankdef[idx] = np.radians(bankangle) # [rad]
             return True
         return True, f"Banklimit of {self.id[idx]} is {int(np.degrees(self.ap.bankdef[idx]))} deg"
+
+    def settrlim(self, idx, maxtr=None, maxdtr2=None):
+        ''' Set or show turn rate limit [deg/s] and turn acceleration limit [deg/s²]. '''
+        if maxtr is not None:
+            self.max_tr[idx] = maxtr
+            if maxdtr2 is not None:
+                self.max_dtr2[idx] = maxdtr2
+            return True
+        tr  = self.max_tr[idx]
+        dtr = self.max_dtr2[idx]
+        tr_str  = f"{tr:.1f} deg/s"  if np.isfinite(tr)  else "unlimited"
+        dtr_str = f"{dtr:.1f} deg/s²" if np.isfinite(dtr) else "unlimited"
+        return True, f"TRLIM {self.id[idx]}: max turn rate = {tr_str}, max turn accel = {dtr_str}"
 
     def setthrottle(self,idx,throttle=""):
         """Set throttle to given value or AUTO, meaning autothrottle on (default)"""

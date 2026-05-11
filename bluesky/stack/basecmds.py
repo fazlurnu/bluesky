@@ -86,6 +86,12 @@ def initbasecmds():
             bs.traf.setbanklim,
             "Set or show bank limit for this vehicle",
         ],
+        "TRLIM": [
+            "TRLIM acid [maxtr(deg/s) [maxdtr2(deg/s2)]]",
+            "acid,[float],[float]",
+            bs.traf.settrlim,
+            "Set or show turn rate limit [deg/s] and turn acceleration limit [deg/s²]",
+        ],
         "BATCH": [
             "BATCH filename",
             "string",
