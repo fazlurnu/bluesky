@@ -164,7 +164,41 @@
       "vs_min": -8,
       "vs_max": 8,
       "h_max": 2500,
-      "d_range_max": 5      
+      "d_range_max": 5
+   }
+  },
+   "Wingcopter": {
+    "name": "Wingcopter 198 (fixed-wing VTOL; v_min is the assumed wing-borne stall floor ~ cruise 27.8 / 1.4, v_max is the 150 km/h top speed, vs assumed)",
+    "n_engines": 8,
+    "engine_type": "TS",
+    "mtow": 25,
+    "oew": 10,
+    "mfc": 0,
+    "engines": [["Motor-WC-1", 0.5], ["Motor-WC-2", 0.5], ["Motor-WC-3", 0.5], ["Motor-WC-4", 0.5], ["Motor-WC-5", 0.5], ["Motor-WC-6", 0.5], ["Motor-WC-7", 0.5], ["Motor-WC-8", 0.5]],
+    "envelop": {
+      "v_min": 20,
+      "v_max": 41.7,
+      "vs_min": -5,
+      "vs_max": 5,
+      "h_max": 2500,
+      "d_range_max": 94
+   }
+  },
+   "Trinity": {
+    "name": "Quantum Systems Trinity F90+ (fixed-wing VTOL; v_min is the assumed stall floor ~ cruise 17 / 1.3, v_max is the ~85 km/h top speed, vs assumed)",
+    "n_engines": 3,
+    "engine_type": "TS",
+    "mtow": 5.0,
+    "oew": 4.3,
+    "mfc": 0,
+    "engines": [["Motor-QS-1", 0.2], ["Motor-QS-2", 0.2], ["Motor-QS-3", 0.2]],
+    "envelop": {
+      "v_min": 13,
+      "v_max": 23.6,
+      "vs_min": -3,
+      "vs_max": 3,
+      "h_max": 4500,
+      "d_range_max": 100
    }
   }
 }  
